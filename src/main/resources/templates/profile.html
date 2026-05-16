@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" th:href="@{/images/favicon.svg}">
+    <title>个人中心 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .profile-container { display: flex; gap: 30px; }
+        .profile-sidebar { width: 200px; }
+        .profile-content { flex: 1; }
+        .menu-item { padding: 15px; margin-bottom: 10px; background: #f8f9fa; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .menu-item:hover, .menu-item.active { background: #667eea; color: #fff; }
+        .status-tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+        .status-pending { background: #fffbe6; color: #faad14; }
+        .status-approved { background: #e6f7ff; color: #1890ff; }
+        .status-checked_in { background: #f6ffed; color: #52c41a; }
+        .status-completed { background: #f5f5f5; color: #999; }
+        .status-cancelled { background: #fff1f0; color: #ff4d4f; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">📚 图书馆座位预约系统</a>
+        <div class="navbar-user">
+            <a href="/" class="btn btn-secondary">返回首页</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-content">
+            <div class="profile-container">
+                <div class="profile-sidebar">
+                    <div class="menu-item active" onclick="showTab('reservations')">📋 我的预约</div>
+                    <div class="menu-item" onclick="showTab('profile')">👤 个人信息</div>
+                    <div class="menu-item" onclick="location.href='/admin'">⚙️ 后台管理</div>
+                </div>
+                <div class="profile-content">
+                    <!-- 预约记录 -->
+                    <div id="reservations">
+                        <h2 class="mb-20">📋 我的预约记录</h2>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>预约编号</th>
+                                    <th>自习室</th>
+                                    <th>座位</th>
+                                    <th>时间</th>
+                                    <th>剩余时间</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reservationList">
+                                <tr><td colspan="6" style="text-align: center; color: #888;">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 个人信息 -->
+                    <div id="profile" style="display: none;">
+                        <h2 class="mb-20">👤 个人信息</h2>
+                        <div class="card">
+                            <div id="userInfo">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/dialog.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script>
+        let currentUser = null;
+
+        // 检查登录
+        fetch('/api/user/info').then(r => r.json()).then(res => {
+            if (res.code !== 200) {
+                appAlert('请先登录');
+                location.href = '/login';
+                return;
+            }
+
+            currentUser = res.data;
+            document.getElementById('userInfo').innerHTML = `
+                <p>用户名: ${currentUser.username}</p>
+                <p>姓名: ${currentUser.realName || '-'}</p>
+                <p>手机: ${currentUser.phone || '-'}</p>
+                <p>邮箱: ${currentUser.email || '-'}</p>
+                <p>信用分: ${currentUser.creditScore || 100}分</p>
+                <p>注册时间: ${currentUser.createTime ? formatDateTime(currentUser.createTime) : '-'}</p>
+            `;
+        });
+
+        // 加载预约记录
+        function loadReservations() {
+            fetch('/api/reservation/my').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    if (res.data.length === 0) {
+                        document.getElementById('reservationList').innerHTML =
+                            '<tr><td colspan="7" style="text-align: center; color: #888;">暂无预约记录</td></tr>';
+                        return;
+                    }
+
+                    const html = res.data.map(r => {
+                        const statusClass = `status-${r.status}`;
+                        const statusText = {
+                            'pending': '待审核',
+                            'approved': '已通过',
+                            'rejected': '已拒绝',
+                            'checked_in': '已签到',
+                            'completed': '已完成',
+                            'cancelled': '已取消'
+                        }[r.status] || r.status;
+
+                        // 计算剩余时间
+                        let remainingTime = '';
+                        if (r.status === 'checked_in' && r.endTime) {
+                            const endTime = new Date(r.endTime.replace('T', ' '));
+                            const now = new Date();
+                            const diff = endTime - now;
+                            if (diff > 0) {
+                                const minutes = Math.floor(diff / 60000);
+                                const hours = Math.floor(minutes / 60);
+                                const mins = minutes % 60;
+                                remainingTime = hours > 0 ? `${hours}小时${mins}分钟` : `${mins}分钟`;
+                            } else {
+                                remainingTime = '已超时';
+                            }
+                        }
+
+                        let actions = '';
+                        if (r.status === 'pending') {
+                            actions = `<button class="btn btn-danger btn-sm" onclick="cancelReservation(${r.id})">取消</button>`;
+                        } else if (r.status === 'approved') {
+                            actions = `<button class="btn btn-success btn-sm" onclick="checkIn(${r.id})">签到</button>`;
+                        } else if (r.status === 'checked_in') {
+                            actions = `<button class="btn btn-secondary btn-sm" onclick="checkOut(${r.id})">签退</button>`;
+                        } else if (r.status === 'completed') {
+                            actions = `<button class="btn btn-primary btn-sm" onclick="goEvaluate(${r.id}, ${r.roomId})">去评价</button>`;
+                        }
+
+                        return `
+                            <tr>
+                                <td>${r.reservationNo}</td>
+                                <td>${r.roomName || '-'}</td>
+                                <td>${r.seatCode || '-'}</td>
+                                <td>${r.startTime ? formatDateTime(r.startTime) : '-'}<br>至 ${r.endTime ? formatDateTime(r.endTime) : '-'}</td>
+                                <td>${remainingTime || '-'}</td>
+                                <td><span class="status-tag ${statusClass}">${statusText}</span></td>
+                                <td>${actions}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    document.getElementById('reservationList').innerHTML = html;
+                }
+            });
+        }
+
+        // 跳转评价
+        function goEvaluate(reservationId, roomId) {
+            location.href = `/studyroom?id=${roomId}&evaluate=${reservationId}`;
+        }
+
+        loadReservations();
+
+        // 取消预约
+        async function cancelReservation(id) {
+            if (!await appConfirm('确定要取消预约吗？')) {
+                return;
+            }
+            fetch(`/api/reservation/cancel/${id}`, {method: 'POST'}).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('已取消');
+                    loadReservations();
+                }
+            });
+        }
+
+        // 签到
+        function checkIn(id) {
+            fetch(`/api/reservation/checkin/${id}`, {method: 'POST'}).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('签到成功');
+                    loadReservations();
+                }
+            });
+        }
+
+        // 签退
+        function checkOut(id) {
+            fetch(`/api/reservation/checkout/${id}`, {method: 'POST'}).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('签退成功');
+                    loadReservations();
+                }
+            });
+        }
+
+        // 切换标签
+        function showTab(tab) {
+            document.querySelectorAll('.profile-content > div').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(tab).style.display = 'block';
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

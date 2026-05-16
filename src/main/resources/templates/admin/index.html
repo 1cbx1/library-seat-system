@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .admin-container { display: flex; min-height: calc(100vh - 60px); }
+        .admin-sidebar {
+            width: 220px;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            padding: 20px 0;
+            transition: all 0.3s;
+            position: fixed;
+            height: 100%;
+            z-index: 100;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        .admin-sidebar.collapsed {
+            width: 70px;
+        }
+        .admin-sidebar.collapsed .admin-menu-item span {
+            display: none;
+        }
+        .admin-toggle {
+            position: fixed;
+            left: 220px;
+            top: 70px;
+            width: 24px;
+            height: 48px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 0 8px 8px 0;
+            z-index: 101;
+            transition: all 0.3s;
+            border: none;
+            font-size: 14px;
+        }
+        .admin-toggle.collapsed {
+            left: 70px;
+        }
+        .admin-toggle:hover {
+            width: 28px;
+            background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+        }
+        .admin-menu-item {
+            padding: 14px 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 3px solid transparent;
+        }
+        .admin-menu-item:hover, .admin-menu-item.active {
+            background: rgba(102, 126, 234, 0.2);
+            border-left-color: #667eea;
+        }
+        .admin-menu-item .icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+        .admin-content {
+            flex: 1;
+            padding: 24px;
+            background: #f0f2f5;
+            margin-left: 220px;
+            transition: margin-left 0.3s;
+            min-height: calc(100vh - 60px);
+        }
+        .admin-content.expanded {
+            margin-left: 70px;
+        }
+        .stat-card {
+            background: #fff;
+            padding: 24px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+            transition: all 0.3s;
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        }
+        .stat-number { font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .stat-label { color: #8c8c8c; margin-top: 8px; font-size: 14px; }
+        .module-box { background: #fff; padding: 24px; border-radius: 16px; margin-top: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+        .form-inline { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+
+        /* 模态框样式 */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .modal.show { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #fff; padding: 32px; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-title { font-size: 20px; font-weight: 600; color: #1a1a1a; }
+        .modal-close { font-size: 28px; cursor: pointer; color: #999; transition: color 0.3s; }
+        .modal-close:hover { color: #333; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; font-weight: 500; color: #1a1a1a; }
+        .form-input { width: 100%; padding: 12px 16px; border: 1px solid #e8e8e8; border-radius: 10px; box-sizing: border-box; transition: all 0.3s; }
+        .form-input:focus { border-color: #667eea; box-shadow: 0 0 0 4px rgba(102,126,234,0.1); outline: none; }
+        .form-row { display: flex; gap: 16px; }
+        .form-row .form-group { flex: 1; }
+        .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+
+        /* 评分样式 */
+        .star-rating { display: flex; gap: 8px; font-size: 28px; cursor: pointer; }
+        .star { color: #e8e8e8; transition: color 0.2s; }
+        .star.active, .star:hover { color: #ffc107; }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .admin-sidebar {
+                width: 0;
+                overflow: hidden;
+            }
+            .admin-sidebar.show {
+                width: 220px;
+            }
+            .admin-toggle {
+                left: 0;
+            }
+            .admin-toggle.show {
+                left: 220px;
+            }
+            .admin-content {
+                margin-left: 0;
+            }
+            .stat-card {
+                padding: 16px;
+                border-radius: 12px;
+            }
+            .stat-number {
+                font-size: 24px;
+            }
+            .navbar-brand {
+                font-size: 14px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);">
+        <a href="/" class="navbar-brand" style="color: #fff;">📚 图书馆座位预约系统 - 管理后台</a>
+        <div class="navbar-user">
+            <span style="color: #fff;" id="adminInfo">管理员</span>
+            <a href="/" class="btn btn-secondary">返回首页</a>
+            <button class="btn btn-warning" style="margin-left: 8px;" onclick="logout()">退出登录</button>
+        </div>
+    </nav>
+
+    <div class="admin-container" id="adminContainer" style="display: none;">
+        <div class="admin-sidebar" id="adminSidebar">
+            <div class="admin-menu-item active" onclick="showModule('dashboard')">📊 <span>数据概览</span></div>
+            <div class="admin-menu-item" onclick="showModule('room')">🏠 <span>自习室管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('seat')">💺 <span>座位管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('reservation')">📋 <span>预约管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('user')">👥 <span>用户管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('announcement')">📢 <span>公告管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('banner')">🎠 <span>轮播图管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('forum')">💬 <span>论坛管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('message')">📝 <span>留言管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('sensitive')">🔒 <span>敏感词管理</span></div>
+            <div class="admin-menu-item" onclick="showModule('evaluation')">⭐ <span>评价管理</span></div>
+        </div>
+        <div class="admin-toggle" id="adminToggle" onclick="toggleSidebar()">☰</div>
+        
+        <div class="admin-content">
+            <!-- 数据概览 -->
+            <div id="module-dashboard">
+                <h2 class="mb-20">📊 数据概览</h2>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-number" id="stat-room">0</div>
+                        <div class="stat-label">自习室数量</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="stat-seat">0</div>
+                        <div class="stat-label">座位总数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="stat-reservation">0</div>
+                        <div class="stat-label">预约总数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="stat-user">0</div>
+                        <div class="stat-label">用户总数</div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <div class="stat-card" style="text-align: left;">
+                        <h3 style="margin-bottom: 15px;">📈 今日数据</h3>
+                        <p>今日新增预约: <strong id="stat-today">0</strong> 条</p>
+                        <p>活跃预约: <strong id="stat-active">0</strong> 条</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 自习室管理 -->
+            <div id="module-room" style="display: none;">
+                <h2 class="mb-20">🏠 自习室管理</h2>
+                <div class="module-box">
+                    <div class="form-inline">
+                        <button class="btn btn-primary" onclick="showAddRoomModal()">+ 添加自习室</button>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>编号</th>
+                                <th>名称</th>
+                                <th>位置</th>
+                                <th>容量</th>
+                                <th>价格(元/小时)</th>
+                                <th>开放时间</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roomTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 座位管理 -->
+            <div id="module-seat" style="display: none;">
+                <h2 class="mb-20">💺 座位管理</h2>
+                <div class="module-box">
+                    <div class="form-inline">
+                        <button class="btn btn-primary" onclick="showAddSeatModal()">+ 添加座位</button>
+                        <select id="seatRoomFilter" class="form-input" style="width: 200px;" onchange="loadSeats()">
+                            <option value="">全部自习室</option>
+                        </select>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>座位编号</th>
+                                <th>所属自习室</th>
+                                <th>电源</th>
+                                <th>靠窗</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="seatTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 预约管理 -->
+            <div id="module-reservation" style="display: none;">
+                <h2 class="mb-20">📋 预约管理</h2>
+                <div class="module-box">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>预约编号</th>
+                                <th>用户</th>
+                                <th>自习室</th>
+                                <th>座位</th>
+                                <th>时间段</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reservationTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 用户管理 -->
+            <div id="module-user" style="display: none;">
+                <h2 class="mb-20">👥 用户管理</h2>
+                <div class="module-box">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>用户名</th>
+                                <th>姓名</th>
+                                <th>手机</th>
+                                <th>角色</th>
+                                <th>信用分</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 公告管理 -->
+            <div id="module-announcement" style="display: none;">
+                <h2 class="mb-20">📢 公告管理</h2>
+                <div class="module-box">
+                    <div class="form-inline">
+                        <button class="btn btn-primary" onclick="showAddAnnouncementModal()">+ 发布公告</button>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>标题</th>
+                                <th>内容</th>
+                                <th>发布时间</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="announcementTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 轮播图管理 -->
+            <div id="module-banner" style="display: none;">
+                <h2 class="mb-20">🎠 轮播图管理</h2>
+                <div class="module-box">
+                    <div class="form-inline">
+                        <button class="btn btn-primary" onclick="showAddBannerModal()">+ 添加轮播图</button>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>标题</th>
+                                <th>图片预览</th>
+                                <th>链接</th>
+                                <th>排序</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bannerTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 论坛管理 -->
+            <div id="module-forum" style="display: none;">
+                <h2 class="mb-20">💬 论坛管理</h2>
+                <div class="module-box">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>标题</th>
+                                <th>发布者</th>
+                                <th>标签</th>
+                                <th>点赞</th>
+                                <th>浏览</th>
+                                <th>评论</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="forumTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 留言管理 -->
+            <div id="module-message" style="display: none;">
+                <h2 class="mb-20">📝 留言管理</h2>
+                <div class="module-box">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>留言人</th>
+                                <th>内容</th>
+                                <th>时间</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="messageTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 敏感词管理 -->
+            <div id="module-sensitive" style="display: none;">
+                <h2 class="mb-20">🔒 敏感词管理</h2>
+                <div class="module-box">
+                    <div class="form-inline">
+                        <input type="text" id="newSensitiveWord" class="form-input" placeholder="输入敏感词" style="width: 200px;">
+                        <button class="btn btn-primary" onclick="addSensitiveWord()">添加</button>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>敏感词</th>
+                                <th>类型</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sensitiveTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 评价管理 -->
+            <div id="module-evaluation" style="display: none;">
+                <h2 class="mb-20">⭐ 评价管理</h2>
+                <div class="module-box">
+                    <div class="form-inline">
+                        <select id="evalRoomFilter" class="form-input" style="width: 200px;" onchange="loadEvaluations()">
+                            <option value="">全部自习室</option>
+                        </select>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>用户</th>
+                                <th>自习室</th>
+                                <th>评分</th>
+                                <th>评价内容</th>
+                                <th>评价时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="evaluationTable"></tbody>
+                    </table>
+                    <div id="evaluationEmpty" style="text-align: center; color: #888; padding: 30px;">暂无评价数据</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自习室弹窗 -->
+    <div id="roomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="roomModalTitle">添加自习室</span>
+                <span class="modal-close" onclick="closeModal('roomModal')">&times;</span>
+            </div>
+            <form id="roomForm">
+                <input type="hidden" id="roomId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">自习室编号</label>
+                        <input type="text" id="roomCode" class="form-input" placeholder="自动生成">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">自习室名称 *</label>
+                        <input type="text" id="roomName" class="form-input" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">位置</label>
+                        <input type="text" id="roomLocation" class="form-input" placeholder="如: 图书馆3楼">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">楼层</label>
+                        <input type="text" id="roomFloor" class="form-input" placeholder="如: 3">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">座位容量</label>
+                        <input type="number" id="roomCapacity" class="form-input" value="50">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">价格(元/小时)</label>
+                        <input type="number" id="roomPrice" class="form-input" value="0" step="0.1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">开放时间</label>
+                        <input type="text" id="roomOpenTime" class="form-input" placeholder="如: 08:00-22:00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">状态</label>
+                        <select id="roomStatus" class="form-input">
+                            <option value="1">开放</option>
+                            <option value="0">关闭</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">描述</label>
+                    <textarea id="roomDescription" class="form-input" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('roomModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 座位弹窗 -->
+    <div id="seatModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="seatModalTitle">添加座位</span>
+                <span class="modal-close" onclick="closeModal('seatModal')">&times;</span>
+            </div>
+            <form id="seatForm">
+                <input type="hidden" id="seatId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">座位编号 *</label>
+                        <input type="text" id="seatCode" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">所属自习室 *</label>
+                        <select id="seatRoomId" class="form-input" required>
+                            <option value="">请选择自习室</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">电源</label>
+                        <select id="seatPower" class="form-input">
+                            <option value="0">无</option>
+                            <option value="1">有</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">靠窗</label>
+                        <select id="seatWindow" class="form-input">
+                            <option value="0">否</option>
+                            <option value="1">是</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">状态</label>
+                    <select id="seatStatus" class="form-input">
+                        <option value="1">可用</option>
+                        <option value="0">维修中</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('seatModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 公告弹窗 -->
+    <div id="announcementModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="announcementModalTitle">发布公告</span>
+                <span class="modal-close" onclick="closeModal('announcementModal')">&times;</span>
+            </div>
+            <form id="announcementForm">
+                <input type="hidden" id="announcementId">
+                <div class="form-group">
+                    <label class="form-label">公告标题 *</label>
+                    <input type="text" id="announcementTitle" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">公告内容 *</label>
+                    <textarea id="announcementContent" class="form-input" rows="5" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">状态</label>
+                    <select id="announcementStatus" class="form-input">
+                        <option value="1">显示</option>
+                        <option value="0">隐藏</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('announcementModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 轮播图弹窗 -->
+    <div id="bannerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="bannerModalTitle">添加轮播图</span>
+                <span class="modal-close" onclick="closeModal('bannerModal')">&times;</span>
+            </div>
+            <form id="bannerForm">
+                <input type="hidden" id="bannerId">
+                <div class="form-group">
+                    <label class="form-label">标题 *</label>
+                    <input type="text" id="bannerTitle" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">图片</label>
+                    <input type="file" id="bannerImageFile" class="form-input" accept="image/*" onchange="previewImage(this)">
+                    <img id="bannerImagePreview" style="max-width: 200px; margin-top: 10px; display: none;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">或直接使用图片URL</label>
+                    <input type="text" id="bannerImageUrlInput" class="form-input" placeholder="例如：https://example.com/banner.jpg">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">链接地址</label>
+                        <input type="text" id="bannerLink" class="form-input" placeholder="http://">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">排序</label>
+                        <input type="number" id="bannerSort" class="form-input" value="0">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('bannerModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 用户弹窗 -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">用户详情</span>
+                <span class="modal-close" onclick="closeModal('userModal')">&times;</span>
+            </div>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">用户名</label>
+                        <input type="text" id="userUsername" class="form-input" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">姓名</label>
+                        <input type="text" id="userRealName" class="form-input">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">手机</label>
+                        <input type="text" id="userPhone" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">角色</label>
+                        <select id="userRole" class="form-input">
+                            <option value="user">普通用户</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">信用分</label>
+                        <input type="number" id="userCreditScore" class="form-input" value="100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">状态</label>
+                        <select id="userStatus" class="form-input">
+                            <option value="1">正常</option>
+                            <option value="0">禁用</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 回复留言弹窗 -->
+    <div id="messageModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <span class="modal-title">回复留言</span>
+                <span class="modal-close" onclick="closeModal('messageModal')">&times;</span>
+            </div>
+            <form id="messageForm">
+                <input type="hidden" id="messageId">
+                <div class="form-group">
+                    <label class="form-label">留言内容</label>
+                    <div id="messageContentPreview" style="padding: 10px; background: #f5f5f5; border-radius: 4px;"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">回复内容 *</label>
+                    <textarea id="messageReply" class="form-input" rows="4" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('messageModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">发送回复</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script th:src="@{/js/dialog.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script>
+        // 全局变量
+        let currentRooms = [];
+
+        // 侧边栏折叠功能
+        function toggleSidebar() {
+            const sidebar = document.getElementById('adminSidebar');
+            const content = document.querySelector('.admin-content');
+            const toggle = document.getElementById('adminToggle');
+
+            if (sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                content.classList.remove('expanded');
+                toggle.classList.remove('collapsed');
+                toggle.textContent = '☰';
+            } else {
+                sidebar.classList.add('collapsed');
+                content.classList.add('expanded');
+                toggle.classList.add('collapsed');
+                toggle.textContent = '▶';
+            }
+        }
+
+        // 检查登录和角色
+        fetch('/api/user/info').then(r => r.json()).then(res => {
+            if (res.code === 200) {
+                const user = res.data;
+                document.getElementById('adminInfo').textContent = user.username;
+                // 检查是否是管理员
+                if (user.role !== 'admin') {
+                    // 显示无权限提示
+                    document.getElementById('adminContainer').innerHTML = `
+                        <div style="width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; flex-direction: column; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <div style="background: white; padding: 40px; border-radius: 15px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+                                <div style="font-size: 60px; margin-bottom: 20px;">⚠️</div>
+                                <h2 style="color: #ff4d4f; margin-bottom: 15px;">无权限访问</h2>
+                                <p style="color: #666; margin-bottom: 25px;">您没有管理权限，仅管理员可以访问后台</p>
+                                <a href="/" class="btn btn-primary" style="display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px;">返回首页</a>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('adminContainer').style.display = 'flex';
+                    return;
+                }
+                // 管理员才显示后台
+                document.getElementById('adminContainer').style.display = 'flex';
+                // 加载数据
+                loadStats();
+            } else {
+                location.href = '/login';
+            }
+        });
+
+        // ==================== 数据加载 ====================
+
+        function loadStats() {
+            fetch('/api/admin/stats').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    document.getElementById('stat-room').textContent = res.data.roomCount || 0;
+                    document.getElementById('stat-seat').textContent = res.data.seatCount || 0;
+                    document.getElementById('stat-reservation').textContent = res.data.reservationCount || 0;
+                    document.getElementById('stat-user').textContent = res.data.userCount || 0;
+                    document.getElementById('stat-today').textContent = res.data.todayReservation || 0;
+                    document.getElementById('stat-active').textContent = res.data.activeReservation || 0;
+                }
+            });
+        }
+
+        async function logout() {
+            if (!await appConfirm('确认退出登录吗？')) {
+                return;
+            }
+            fetch('/api/user/logout', { method: 'POST' }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    location.href = '/login';
+                } else {
+                    appAlert(res.message || '退出失败');
+                }
+            }).catch(() => appAlert('退出失败，请稍后重试'));
+        }
+
+        // 模态框操作
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        // 关闭模态框点击外部
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
+        };
+
+        // 显示模块
+        function showModule(module) {
+            document.querySelectorAll('[id^="module-"]').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.admin-menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('module-' + module).style.display = 'block';
+            event.target.classList.add('active');
+            
+            switch(module) {
+                case 'dashboard': loadStats(); break;
+                case 'room': loadRooms(); break;
+                case 'seat': loadSeats(); break;
+                case 'reservation': loadReservations(); break;
+                case 'user': loadUsers(); break;
+                case 'announcement': loadAnnouncements(); break;
+                case 'banner': loadBanners(); break;
+                case 'forum': loadForums(); break;
+                case 'message': loadMessages(); break;
+                case 'sensitive': loadSensitive(); break;
+                case 'evaluation': loadEvaluations(); loadRoomsForEvalFilter(); break;
+            }
+        }
+
+        // ==================== 数据加载 ====================
+
+        function loadStats() {
+            fetch('/api/admin/stats').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    document.getElementById('stat-room').textContent = res.data.roomCount || 0;
+                    document.getElementById('stat-seat').textContent = res.data.seatCount || 0;
+                    document.getElementById('stat-reservation').textContent = res.data.reservationCount || 0;
+                    document.getElementById('stat-user').textContent = res.data.userCount || 0;
+                    document.getElementById('stat-today').textContent = res.data.todayReservation || 0;
+                    document.getElementById('stat-active').textContent = res.data.activeReservation || 0;
+                }
+            });
+        }
+
+        function loadRooms() {
+            fetch('/api/room/admin/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    currentRooms = res.data;
+                    const html = res.data.map(r => `
+                        <tr>
+                            <td>${r.roomCode || '-'}</td>
+                            <td>${r.roomName}</td>
+                            <td>${r.location || '-'}</td>
+                            <td>${r.capacity || 0}</td>
+                            <td>¥${r.hourPrice || 0}</td>
+                            <td>${r.openTime || '-'}</td>
+                            <td><span class="tag ${r.status === 1 ? 'tag-success' : 'tag-danger'}">${r.status === 1 ? '开放' : '关闭'}</span></td>
+                            <td>
+                                <button class="btn btn-secondary btn-sm" onclick="editRoom(${r.id})">编辑</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteRoom(${r.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('roomTable').innerHTML = html || '<tr><td colspan="8">暂无数据</td></tr>';
+                    
+                    // 更新座位管理的自习室选择
+                    updateRoomSelect();
+                }
+            });
+        }
+
+        function updateRoomSelect() {
+            let options = '<option value="">全部自习室</option>';
+            currentRooms.forEach(r => {
+                options += `<option value="${r.id}">${r.roomName}</option>`;
+            });
+            document.getElementById('seatRoomFilter').innerHTML = options;
+            document.getElementById('seatRoomId').innerHTML = '<option value="">请选择自习室</option>' + 
+                currentRooms.map(r => `<option value="${r.id}">${r.roomName}</option>`).join('');
+        }
+
+        function loadSeats() {
+            const roomId = document.getElementById('seatRoomFilter').value;
+            fetch('/api/seat/admin/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    let seats = res.data;
+                    if (roomId) {
+                        seats = seats.filter(s => s.roomId == roomId);
+                    }
+                    // 匹配自习室名称
+                    seats.forEach(s => {
+                        const room = currentRooms.find(r => r.id === s.roomId);
+                        s.roomName = room ? room.roomName : '-';
+                    });
+                    const html = seats.map(s => `
+                        <tr>
+                            <td>${s.seatCode}</td>
+                            <td>${s.roomName}</td>
+                            <td>${s.hasPower === 1 ? '⚡' : '-'}</td>
+                            <td>${s.hasWindow === 1 ? '🪟' : '-'}</td>
+                            <td><span class="tag ${s.status === 1 ? 'tag-success' : 'tag-danger'}">${s.status === 1 ? '可用' : '维修'}</span></td>
+                            <td>
+                                <button class="btn btn-secondary btn-sm" onclick="editSeat(${s.id})">编辑</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteSeat(${s.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('seatTable').innerHTML = html || '<tr><td colspan="6">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        function loadReservations() {
+            fetch('/api/admin/reservation/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const html = res.data.map(r => `
+                        <tr>
+                            <td>${r.reservationNo || '-'}</td>
+                            <td>${r.userName || '-'}</td>
+                            <td>${r.roomName || '-'}</td>
+                            <td>${r.seatCode || '-'}</td>
+                            <td>${r.startTime ? formatDateTime(r.startTime) : '-'}<br>至 ${r.endTime ? formatDateTime(r.endTime) : '-'}</td>
+                            <td><span class="tag ${getStatusTag(r.status)}">${getStatusText(r.status)}</span></td>
+                            <td>
+                                ${r.auditStatus === 'pending' ? `
+                                    <button class="btn btn-success btn-sm" onclick="auditReservation(${r.id}, 'approved')">通过</button>
+                                    <button class="btn btn-danger btn-sm" onclick="auditReservation(${r.id}, 'rejected')">拒绝</button>
+                                ` : '-'}
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('reservationTable').innerHTML = html || '<tr><td colspan="7">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        function loadUsers() {
+            fetch('/api/user/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const html = res.data.map(u => `
+                        <tr>
+                            <td>${u.username}</td>
+                            <td>${u.realName || '-'}</td>
+                            <td>${u.phone || '-'}</td>
+                            <td>${u.role === 'admin' ? '<span class="tag tag-primary">管理员</span>' : '普通用户'}</td>
+                            <td><span style="color: ${u.creditScore < 60 ? 'red' : 'green'}">${u.creditScore || 100}</span></td>
+                            <td><span class="tag ${u.status === 1 ? 'tag-success' : 'tag-danger'}">${u.status === 1 ? '正常' : '禁用'}</span></td>
+                            <td>
+                                <button class="btn btn-secondary btn-sm" onclick="editUser(${u.id})">编辑</button>
+                                <button class="btn btn-warning btn-sm" onclick="toggleUserStatus(${u.id}, ${u.status === 1 ? 0 : 1})">${u.status === 1 ? '禁用' : '启用'}</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('userTable').innerHTML = html || '<tr><td colspan="7">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        function loadAnnouncements() {
+            fetch('/api/announcement/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const html = res.data.map(a => `
+                        <tr>
+                            <td>${a.title}</td>
+                            <td>${(a.content || '').substring(0, 40)}${(a.content || '').length > 40 ? '...' : ''}</td>
+                            <td>${a.createTime ? formatDateTime(a.createTime) : '-'}</td>
+                            <td>
+                                <span class="tag ${a.status === 1 ? 'tag-success' : 'tag-secondary'}">${a.status === 1 ? '显示' : '隐藏'}</span>
+                                ${a.top === 1 ? '<span class="tag tag-primary" style="margin-left:5px;">置顶</span>' : ''}
+                            </td>
+                            <td>
+                                <button class="btn btn-secondary btn-sm" onclick="editAnnouncement(${a.id})">编辑</button>
+                                <button class="btn btn-warning btn-sm" onclick="toggleAnnouncementTop(${a.id}, ${a.top === 1 ? 0 : 1})">${a.top === 1 ? '取消置顶' : '置顶'}</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteAnnouncement(${a.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('announcementTable').innerHTML = html || '<tr><td colspan="5">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        function loadBanners() {
+            fetch('/api/banner/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const html = res.data.map(b => `
+                        <tr>
+                            <td>${b.title}</td>
+                            <td><img src="${b.imageUrl}" style="width: 150px; height: 60px; object-fit: cover;" onerror="this.src='https://picsum.photos/300/120?grayscale&random=99'"></td>
+                            <td>${b.linkUrl || '-'}</td>
+                            <td>${b.sort || 0}</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm" onclick="deleteBanner(${b.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('bannerTable').innerHTML = html || '<tr><td colspan="5">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        function loadForums() {
+            fetch('/api/post/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const html = res.data.map(p => `
+                        <tr>
+                            <td>${(p.title || '').substring(0, 20)}${(p.title || '').length > 20 ? '...' : ''}</td>
+                            <td>${p.userName || '-'}</td>
+                            <td>${p.tag || '-'}</td>
+                            <td>${p.likeCount || 0}</td>
+                            <td>${p.viewCount || 0}</td>
+                            <td>${p.commentCount || 0}</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('forumTable').innerHTML = html || '<tr><td colspan="7">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        function loadMessages() {
+            fetch('/api/message/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const html = res.data.map(m => `
+                        <tr>
+                            <td>${m.userName || '匿名'}</td>
+                            <td>${(m.content || '').substring(0, 30)}${(m.content || '').length > 30 ? '...' : ''}</td>
+                            <td>${m.createTime ? formatDateTime(m.createTime) : '-'}</td>
+                            <td><span class="tag ${m.status === 1 ? 'tag-success' : 'tag-warning'}">${m.status === 1 ? '已回复' : '待回复'}</span></td>
+                            <td>
+                                ${m.status === 0 ? `<button class="btn btn-primary btn-sm" onclick="replyMessage(${m.id}, '${escapeHtml(m.content || '')}')">回复</button>` : ''}
+                                <button class="btn btn-danger btn-sm" onclick="deleteMessage(${m.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('messageTable').innerHTML = html || '<tr><td colspan="5">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        function loadSensitive() {
+            fetch('/api/sensitive/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const html = res.data.map(s => `
+                        <tr>
+                            <td>${s.id}</td>
+                            <td>${s.word}</td>
+                            <td>${s.type || '-'}</td>
+                            <td><span class="tag ${s.status === 1 ? 'tag-success' : 'tag-secondary'}">${s.status === 1 ? '启用' : '禁用'}</span></td>
+                            <td><button class="btn btn-danger btn-sm" onclick="deleteSensitive(${s.id})">删除</button></td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('sensitiveTable').innerHTML = html || '<tr><td colspan="5">暂无数据</td></tr>';
+                }
+            });
+        }
+
+        // ==================== 评价管理 ====================
+        function loadEvaluations() {
+            const roomId = document.getElementById('evalRoomFilter').value;
+            let url = '/api/evaluation/all';
+            if (roomId) url += `?roomId=${roomId}`;
+
+            fetch(url).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const list = res.data || [];
+                    if (list.length === 0) {
+                        document.getElementById('evaluationTable').innerHTML = '';
+                        document.getElementById('evaluationEmpty').style.display = 'block';
+                        return;
+                    }
+                    document.getElementById('evaluationEmpty').style.display = 'none';
+                    const html = list.map(e => {
+                        const stars = '★'.repeat(e.score) + '☆'.repeat(5 - e.score);
+                        return `
+                            <tr>
+                                <td>${e.id}</td>
+                                <td>${e.userName || '匿名'}</td>
+                                <td>${e.roomName || '-'}</td>
+                                <td style="color: #fadb14;">${stars}</td>
+                                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${e.content || '无'}</td>
+                                <td>${e.createTime ? formatDateTime(e.createTime) : '-'}</td>
+                                <td><button class="btn btn-danger btn-sm" onclick="deleteEvaluation(${e.id})">删除</button></td>
+                            </tr>
+                        `;
+                    }).join('');
+                    document.getElementById('evaluationTable').innerHTML = html;
+                }
+            });
+        }
+
+        function deleteEvaluation(id) {
+            if (!confirm('确定要删除这条评价吗？')) return;
+            fetch(`/api/evaluation/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('删除成功');
+                    loadEvaluations();
+                } else {
+                    appAlert(res.message || '删除失败');
+                }
+            });
+        }
+
+        function loadRoomsForEvalFilter() {
+            fetch('/api/room/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const select = document.getElementById('evalRoomFilter');
+                    res.data.forEach(room => {
+                        const opt = document.createElement('option');
+                        opt.value = room.id;
+                        opt.textContent = room.roomName;
+                        select.appendChild(opt);
+                    });
+                }
+            });
+        }
+
+        // ==================== CRUD操作 ====================
+
+        // 自习室
+        function showAddRoomModal() {
+            document.getElementById('roomModalTitle').textContent = '添加自习室';
+            document.getElementById('roomForm').reset();
+            document.getElementById('roomId').value = '';
+            showModal('roomModal');
+        }
+
+        function editRoom(id) {
+            const room = currentRooms.find(r => r.id === id);
+            if (!room) return;
+            document.getElementById('roomModalTitle').textContent = '编辑自习室';
+            document.getElementById('roomId').value = room.id;
+            document.getElementById('roomCode').value = room.roomCode || '';
+            document.getElementById('roomName').value = room.roomName;
+            document.getElementById('roomLocation').value = room.location || '';
+            document.getElementById('roomFloor').value = room.floor || '';
+            document.getElementById('roomCapacity').value = room.capacity || 50;
+            document.getElementById('roomPrice').value = room.hourPrice || 0;
+            document.getElementById('roomOpenTime').value = room.openTime || '';
+            document.getElementById('roomStatus').value = room.status || 1;
+            document.getElementById('roomDescription').value = room.description || '';
+            showModal('roomModal');
+        }
+
+        document.getElementById('roomForm').onsubmit = function(e) {
+            e.preventDefault();
+            const id = document.getElementById('roomId').value;
+            const data = {
+                roomCode: document.getElementById('roomCode').value,
+                roomName: document.getElementById('roomName').value,
+                location: document.getElementById('roomLocation').value,
+                floor: document.getElementById('roomFloor').value,
+                capacity: parseInt(document.getElementById('roomCapacity').value),
+                hourPrice: parseFloat(document.getElementById('roomPrice').value),
+                openTime: document.getElementById('roomOpenTime').value,
+                status: parseInt(document.getElementById('roomStatus').value),
+                description: document.getElementById('roomDescription').value
+            };
+            
+            const url = id ? `/api/room/${id}` : '/api/room';
+            const method = id ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert(id ? '更新成功' : '添加成功');
+                    closeModal('roomModal');
+                    loadRooms();
+                } else {
+                    appAlert(res.message || '操作失败');
+                }
+            });
+        };
+
+        async function deleteRoom(id) {
+            if (!await appConfirm('确定删除此自习室？')) return;
+            fetch(`/api/room/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('删除成功');
+                    loadRooms();
+                }
+            });
+        }
+
+        // 座位
+        function showAddSeatModal() {
+            document.getElementById('seatModalTitle').textContent = '添加座位';
+            document.getElementById('seatForm').reset();
+            document.getElementById('seatId').value = '';
+            showModal('seatModal');
+        }
+
+        function editSeat(id) {
+            fetch('/api/seat/admin/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const seat = res.data.find(s => s.id === id);
+                    if (!seat) return;
+                    document.getElementById('seatModalTitle').textContent = '编辑座位';
+                    document.getElementById('seatId').value = seat.id;
+                    document.getElementById('seatCode').value = seat.seatCode;
+                    document.getElementById('seatRoomId').value = seat.roomId;
+                    document.getElementById('seatPower').value = seat.hasPower || 0;
+                    document.getElementById('seatWindow').value = seat.hasWindow || 0;
+                    document.getElementById('seatStatus').value = seat.status || 1;
+                    showModal('seatModal');
+                }
+            });
+        }
+
+        document.getElementById('seatForm').onsubmit = function(e) {
+            e.preventDefault();
+            const id = document.getElementById('seatId').value;
+            const data = {
+                seatCode: document.getElementById('seatCode').value,
+                roomId: parseInt(document.getElementById('seatRoomId').value),
+                hasPower: parseInt(document.getElementById('seatPower').value),
+                hasWindow: parseInt(document.getElementById('seatWindow').value),
+                status: parseInt(document.getElementById('seatStatus').value)
+            };
+            
+            const url = id ? `/api/seat/${id}` : '/api/seat';
+            const method = id ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert(id ? '更新成功' : '添加成功');
+                    closeModal('seatModal');
+                    loadSeats();
+                }
+            });
+        };
+
+        async function deleteSeat(id) {
+            if (!await appConfirm('确定删除此座位？')) return;
+            fetch(`/api/seat/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('删除成功');
+                    loadSeats();
+                }
+            });
+        }
+
+        // 预约审核
+        function auditReservation(id, status) {
+            fetch('/api/admin/reservation/audit/' + id, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: status, reply: ''})
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('操作成功');
+                    loadReservations();
+                }
+            });
+        }
+
+        // 用户管理
+        let currentUsers = [];
+        
+        function editUser(id) {
+            const user = currentUsers.find(u => u.id === id);
+            if (!user) {
+                fetch('/api/user/list').then(r => r.json()).then(res => {
+                    if (res.code === 200) {
+                        currentUsers = res.data;
+                        const u = res.data.find(x => x.id === id);
+                        if (u) fillUserForm(u);
+                    }
+                });
+            } else {
+                fillUserForm(user);
+            }
+        }
+
+        function fillUserForm(u) {
+            document.getElementById('userId').value = u.id;
+            document.getElementById('userUsername').value = u.username;
+            document.getElementById('userRealName').value = u.realName || '';
+            document.getElementById('userPhone').value = u.phone || '';
+            document.getElementById('userRole').value = u.role || 'user';
+            document.getElementById('userCreditScore').value = u.creditScore || 100;
+            document.getElementById('userStatus').value = u.status || 1;
+            showModal('userModal');
+        }
+
+        document.getElementById('userForm').onsubmit = function(e) {
+            e.preventDefault();
+            const data = {
+                realName: document.getElementById('userRealName').value,
+                phone: document.getElementById('userPhone').value,
+                role: document.getElementById('userRole').value,
+                creditScore: parseInt(document.getElementById('userCreditScore').value),
+                status: parseInt(document.getElementById('userStatus').value)
+            };
+            const id = document.getElementById('userId').value;
+            fetch(`/api/user/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('更新成功');
+                    closeModal('userModal');
+                    loadUsers();
+                }
+            });
+        };
+
+        function toggleUserStatus(id, status) {
+            fetch(`/api/user/${id}/status`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: status})
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('状态更新成功');
+                    loadUsers();
+                }
+            });
+        }
+
+        // 公告
+        let currentAnnouncements = [];
+        
+        function showAddAnnouncementModal() {
+            document.getElementById('announcementModalTitle').textContent = '发布公告';
+            document.getElementById('announcementForm').reset();
+            document.getElementById('announcementId').value = '';
+            showModal('announcementModal');
+        }
+
+        function editAnnouncement(id) {
+            fetch('/api/announcement/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const a = res.data.find(x => x.id === id);
+                    if (!a) return;
+                    document.getElementById('announcementModalTitle').textContent = '编辑公告';
+                    document.getElementById('announcementId').value = a.id;
+                    document.getElementById('announcementTitle').value = a.title;
+                    document.getElementById('announcementContent').value = a.content;
+                    document.getElementById('announcementStatus').value = a.status || 1;
+                    showModal('announcementModal');
+                }
+            });
+        }
+
+        document.getElementById('announcementForm').onsubmit = function(e) {
+            e.preventDefault();
+            const id = document.getElementById('announcementId').value;
+            const data = {
+                title: document.getElementById('announcementTitle').value,
+                content: document.getElementById('announcementContent').value,
+                status: parseInt(document.getElementById('announcementStatus').value)
+            };
+            const url = id ? `/api/announcement/${id}` : '/api/announcement';
+            const method = id ? 'PUT' : 'POST';
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert(id ? '更新成功' : '发布成功');
+                    closeModal('announcementModal');
+                    loadAnnouncements();
+                }
+            });
+        };
+
+        async function deleteAnnouncement(id) {
+            if (!await appConfirm('确定删除此公告？')) return;
+            fetch(`/api/announcement/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) loadAnnouncements();
+            });
+        }
+
+        function toggleAnnouncementTop(id, top) {
+            fetch(`/api/announcement/${id}/top`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({top: top})
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('操作成功');
+                    loadAnnouncements();
+                }
+            });
+        }
+
+        // 轮播图
+        function showAddBannerModal() {
+            document.getElementById('bannerModalTitle').textContent = '添加轮播图';
+            document.getElementById('bannerForm').reset();
+            document.getElementById('bannerId').value = '';
+            document.getElementById('bannerImagePreview').style.display = 'none';
+            showModal('bannerModal');
+        }
+
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('bannerImagePreview').src = e.target.result;
+                    document.getElementById('bannerImagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        document.getElementById('bannerForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('bannerImageFile');
+            const urlInput = document.getElementById('bannerImageUrlInput').value.trim();
+
+            // 如果填写了 URL，则直接用 URL，不上传文件
+            if (!fileInput.files[0] && urlInput) {
+                const data = {
+                    title: document.getElementById('bannerTitle').value,
+                    imageUrl: urlInput,
+                    linkUrl: document.getElementById('bannerLink').value,
+                    sort: parseInt(document.getElementById('bannerSort').value) || 0
+                };
+                fetch('/api/banner', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                }).then(r => r.json()).then(res2 => {
+                    if (res2.code === 200) {
+                        appAlert('添加成功');
+                        closeModal('bannerModal');
+                        loadBanners();
+                    } else {
+                        appAlert(res2.message || '添加失败');
+                    }
+                });
+                return;
+            }
+
+            // 如果没填 URL，则走原来的上传逻辑
+            if (!fileInput.files[0]) {
+                appAlert('请选择图片或填写图片URL');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            fetch('/api/upload/banner', {
+                method: 'POST',
+                body: formData
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    const data = {
+                        title: document.getElementById('bannerTitle').value,
+                        imageUrl: res.data,
+                        linkUrl: document.getElementById('bannerLink').value,
+                        sort: parseInt(document.getElementById('bannerSort').value) || 0
+                    };
+                    fetch('/api/banner', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    }).then(r => r.json()).then(res2 => {
+                        if (res2.code === 200) {
+                            appAlert('添加成功');
+                            closeModal('bannerModal');
+                            loadBanners();
+                        } else {
+                            appAlert(res2.message || '添加失败');
+                        }
+                    });
+                } else {
+                    appAlert(res.message || '上传失败');
+                }
+            });
+        };
+
+        async function deleteBanner(id) {
+            if (!await appConfirm('确定删除此轮播图？')) return;
+            fetch(`/api/banner/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) loadBanners();
+            });
+        }
+
+        // 论坛
+        async function deletePost(id) {
+            if (!await appConfirm('确定删除此帖子？')) return;
+            fetch(`/api/post/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) loadForums();
+            });
+        }
+
+        // 留言
+        function replyMessage(id, content) {
+            document.getElementById('messageId').value = id;
+            document.getElementById('messageContentPreview').textContent = content;
+            document.getElementById('messageReply').value = '';
+            showModal('messageModal');
+        }
+
+        document.getElementById('messageForm').onsubmit = function(e) {
+            e.preventDefault();
+            const id = document.getElementById('messageId').value;
+            const reply = document.getElementById('messageReply').value;
+            fetch(`/api/message/reply/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({replyContent: reply})
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('回复成功');
+                    closeModal('messageModal');
+                    loadMessages();
+                }
+            });
+        };
+
+        async function deleteMessage(id) {
+            if (!await appConfirm('确定删除此留言？')) return;
+            fetch(`/api/message/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) loadMessages();
+            });
+        }
+
+        // 敏感词
+        function addSensitiveWord() {
+            const word = document.getElementById('newSensitiveWord').value;
+            if (!word) { appAlert('请输入敏感词'); return; }
+            fetch('/api/sensitive', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({word: word, type: 'content'})
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('添加成功');
+                    document.getElementById('newSensitiveWord').value = '';
+                    loadSensitive();
+                }
+            });
+        }
+
+        async function deleteSensitive(id) {
+            if (!await appConfirm('确定删除？')) return;
+            fetch(`/api/sensitive/${id}`, {method: 'DELETE'}).then(r => r.json()).then(res => {
+                if (res.code === 200) loadSensitive();
+            });
+        }
+
+        // 辅助函数
+        function getStatusTag(status) {
+            const map = {
+                'pending': 'tag-warning',
+                'approved': 'tag-primary',
+                'rejected': 'tag-danger',
+                'checked_in': 'tag-success',
+                'completed': 'tag-secondary',
+                'cancelled': 'tag-danger'
+            };
+            return map[status] || 'tag-secondary';
+        }
+
+        function getStatusText(status) {
+            const map = {
+                'pending': '待审核',
+                'approved': '已通过',
+                'rejected': '已拒绝',
+                'checked_in': '已签到',
+                'completed': '已完成',
+                'cancelled': '已取消'
+            };
+            return map[status] || status;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

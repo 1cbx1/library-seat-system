@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" th:href="@{/images/favicon.svg}">
+    <title>注册 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background:
+                radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 70% 80%, rgba(139, 92, 246, 0.12) 0%, transparent 40%);
+            animation: bgFloat 20s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes bgFloat {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-3%, 3%); }
+        }
+
+        .register-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .register-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 24px;
+            padding: 48px 40px;
+            box-shadow: var(--shadow-lg);
+            animation: cardEnter 0.6s var(--ease-out-expo);
+        }
+
+        @keyframes cardEnter {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .register-logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+        }
+
+        .register-logo svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .register-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--color-text);
+            margin-bottom: 8px;
+        }
+
+        .register-subtitle {
+            font-size: 14px;
+            color: var(--color-text-muted);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text);
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--color-surface-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            font-size: 15px;
+            color: var(--color-text);
+            transition: all 0.2s;
+        }
+
+        .form-input::placeholder {
+            color: var(--color-text-subtle);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+        }
+
+        .btn-register {
+            width: 100%;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 12px;
+            font-family: 'Outfit', sans-serif;
+            margin-top: 8px;
+        }
+
+        .register-footer {
+            text-align: center;
+            margin-top: 28px;
+            font-size: 14px;
+            color: var(--color-text-muted);
+        }
+
+        .register-footer a {
+            color: var(--color-primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .register-footer a:hover {
+            color: var(--color-accent);
+        }
+
+        .back-home {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            z-index: 10;
+        }
+
+        @media (max-width: 480px) {
+            .register-card {
+                padding: 32px 24px;
+                border-radius: 20px;
+            }
+            .register-title {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="btn btn-ghost back-home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+        返回首页
+    </a>
+    <button id="themeToggle" class="btn btn-ghost" style="position: fixed; top: 24px; right: 24px; padding: 10px; border-radius: 12px; z-index: 10;">
+        <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+    </button>
+
+    <div class="register-container">
+        <div class="register-card">
+            <div class="register-header">
+                <div class="register-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="8.5" cy="7" r="4"/>
+                        <line x1="20" y1="8" x2="20" y2="14"/>
+                        <line x1="23" y1="11" x2="17" y2="11"/>
+                    </svg>
+                </div>
+                <h1 class="register-title">创建账号</h1>
+                <p class="register-subtitle">注册账号，开始预约座位</p>
+            </div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label class="form-label">用户名</label>
+                    <input type="text" name="username" class="form-input" placeholder="请输入用户名" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">真实姓名</label>
+                    <input type="text" name="realName" class="form-input" placeholder="请输入真实姓名" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">手机号</label>
+                    <input type="text" name="phone" class="form-input" placeholder="请输入手机号" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">密码</label>
+                    <input type="password" name="password" class="form-input" placeholder="请输入密码" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">确认密码</label>
+                    <input type="password" name="confirmPassword" class="form-input" placeholder="请确认密码" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-register">注 册</button>
+            </form>
+
+            <div class="register-footer">
+                已有账号？<a href="/login">立即登录</a>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/dialog.js}"></script>
+    <script>
+        // Theme toggle
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            const icon = document.getElementById('themeIcon');
+            if (theme === 'light') {
+                icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+            } else {
+                icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+            }
+        }
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme);
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            if (formData.get('password') !== formData.get('confirmPassword')) {
+                await appAlert('两次密码输入不一致！');
+                return;
+            }
+
+            const data = {
+                username: formData.get('username'),
+                realName: formData.get('realName'),
+                phone: formData.get('phone'),
+                password: formData.get('password')
+            };
+
+            try {
+                const res = await fetch('/api/user/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                }).then(r => r.json());
+
+                if (res.code === 200) {
+                    appAlert('注册成功！请登录').then(() => {
+                        location.href = '/login';
+                    });
+                } else {
+                    appAlert(res.message);
+                }
+            } catch (err) {
+                appAlert('注册失败，请稍后重试');
+            }
+        });
+    </script>
+</body>
+</html>

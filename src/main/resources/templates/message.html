@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" th:href="@{/images/favicon.svg}">
+    <title>留言板 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">📚 图书馆座位预约系统</a>
+        <ul class="navbar-menu">
+            <li><a href="/">首页</a></li>
+            <li><a href="/studyroom">自习室</a></li>
+            <li><a href="/forum">交流论坛</a></li>
+            <li><a href="/announcement">系统公告</a></li>
+            <li><a href="/message" class="active">留言板</a></li>
+        </ul>
+        <div class="navbar-user">
+            <span id="userInfo"></span>
+            <a href="/login" class="btn btn-primary" id="loginBtn">登录</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-content">
+            <h2 class="mb-20">💬 留言板</h2>
+            
+            <!-- 发布留言 -->
+            <div class="card mb-20">
+                <h3 class="mb-10">我要留言</h3>
+                <form id="messageForm">
+                    <div class="form-group">
+                        <input type="text" name="title" class="form-input" placeholder="留言标题（选填）">
+                    </div>
+                    <div class="form-group">
+                        <textarea name="content" class="form-input" rows="4" placeholder="请输入留言内容..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">提交留言</button>
+                </form>
+            </div>
+
+            <!-- 留言列表 -->
+            <div id="messageList">
+                <p style="color: #888; text-align: center;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/dialog.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script>
+        // 检查登录状态
+        fetch('/api/user/info').then(r => r.json()).then(res => {
+            if (res.code === 200) {
+                const userName = res.data.realName || res.data.username;
+                document.getElementById('userInfo').innerHTML = `<span>欢迎，${userName}</span>`;
+                document.getElementById('loginBtn').outerHTML =
+                    '<a href="/profile" class="btn btn-secondary">个人中心</a>' +
+                    '<button class="btn btn-warning" style="margin-left: 8px;" onclick="logout()">退出登录</button>';
+            }
+        });
+
+        async function logout() {
+            if (!await appConfirm('确认退出登录吗？')) {
+                return;
+            }
+            fetch('/api/user/logout', { method: 'POST' }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    location.href = '/login';
+                } else {
+                    appAlert(res.message || '退出失败');
+                }
+            }).catch(() => appAlert('退出失败，请稍后重试'));
+        }
+
+        // 提交留言
+        document.getElementById('messageForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch('/api/user/info').then(r => r.json()).then(res => {
+                if (res.code !== 200) {
+                    appAlert('请先登录');
+                    location.href = '/login';
+                    return;
+                }
+                
+                const formData = new FormData(this);
+                const data = {
+                    title: formData.get('title'),
+                    content: formData.get('content')
+                };
+                
+                fetch('/api/message', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                }).then(r => r.json()).then(res => {
+                    if (res.code === 200) {
+                        appAlert('留言成功');
+                        this.reset();
+                        loadMessages();
+                    } else {
+                        appAlert(res.message);
+                    }
+                });
+            });
+        });
+
+        // 加载留言
+        function loadMessages() {
+            fetch('/api/message/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    if (res.data.length === 0) {
+                        document.getElementById('messageList').innerHTML = 
+                            '<p style="color: #888; text-align: center;">暂无留言</p>';
+                        return;
+                    }
+                    
+                    const html = res.data.map(m => `
+                        <div class="card">
+                            <div class="flex-between">
+                                <h4>${m.title || '无标题'}</h4>
+                                <span class="tag ${m.status === 1 ? 'tag-success' : 'tag-warning'}">
+                                    ${m.status === 1 ? '已回复' : '待回复'}
+                                </span>
+                            </div>
+                            <p style="color: #666; margin: 10px 0;">${m.content}</p>
+                            <p style="color: #999; font-size: 12px;">
+                                👤 ${m.userName || '匿名'} | 📅 ${m.createTime ? formatDateTime(m.createTime) : ''}
+                            </p>
+                            ${m.replyContent ? `
+                                <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                                    <p style="color: #667eea; font-size: 12px;">💬 管理员回复:</p>
+                                    <p style="color: #666;">${m.replyContent}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('');
+                    document.getElementById('messageList').innerHTML = html;
+                }
+            });
+        }
+        
+        loadMessages();
+    </script>
+</body>
+</html>

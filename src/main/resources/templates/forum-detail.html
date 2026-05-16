@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" th:href="@{/images/favicon.svg}">
+    <title>帖子详情 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .post-header { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .post-title { font-size: 22px; font-weight: bold; color: #333; }
+        .post-meta { color: #888; font-size: 13px; margin-top: 8px; }
+        .post-content { margin-top: 15px; line-height: 1.7; color: #444; white-space: pre-wrap; }
+        .comment-item { border-bottom: 1px dashed #eee; padding: 10px 0; }
+        .comment-meta { color: #999; font-size: 12px; margin-bottom: 5px; }
+        .comment-content { color: #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">📚 图书馆座位预约系统</a>
+        <ul class="navbar-menu">
+            <li><a href="/">首页</a></li>
+            <li><a href="/studyroom">自习室</a></li>
+            <li><a href="/forum" class="active">交流论坛</a></li>
+            <li><a href="/announcement">系统公告</a></li>
+            <li><a href="/message">留言板</a></li>
+        </ul>
+        <div class="navbar-user">
+            <span id="userInfo"></span>
+            <a href="/login" class="btn btn-primary" id="loginBtn">登录</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-content">
+            <button class="btn btn-secondary" onclick="history.back()" style="margin-bottom: 15px;">返回论坛列表</button>
+            
+            <div id="postDetail" class="card">
+                <p style="color:#888;text-align:center;">加载中...</p>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>评论</h3>
+                <div id="commentList">
+                    <p style="color:#888;">暂无评论</p>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>发表评论</h3>
+                <textarea id="commentInput" class="form-input" rows="3" placeholder="说点什么吧..."></textarea>
+                <button onclick="submitComment()" class="btn btn-primary" style="margin-top:10px;">提交评论</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/dialog.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script>
+        // 获取URL中的帖子ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const postId = urlParams.get('id');
+
+        if (!postId) {
+            appAlert('参数错误，缺少帖子ID');
+        }
+
+        // 检查登录
+        fetch('/api/user/info').then(r => r.json()).then(res => {
+            if (res.code === 200) {
+                const userName = res.data.realName || res.data.username;
+                document.getElementById('userInfo').innerHTML = `<span>欢迎，${userName}</span>`;
+                document.getElementById('loginBtn').outerHTML =
+                    '<a href="/profile" class="btn btn-secondary">个人中心</a>' +
+                    '<button class="btn btn-warning" style="margin-left: 8px;" onclick="logout()">退出登录</button>';
+            }
+        });
+
+        async function logout() {
+            if (!await appConfirm('确认退出登录吗？')) {
+                return;
+            }
+            fetch('/api/user/logout', { method: 'POST' }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    location.href = '/login';
+                } else {
+                    appAlert(res.message || '退出失败');
+                }
+            }).catch(() => appAlert('退出失败，请稍后重试'));
+        }
+
+        // 加载帖子详情和评论
+        function loadPostDetail() {
+            fetch('/api/post/' + postId).then(r => r.json()).then(res => {
+                if (res.code !== 200) {
+                    document.getElementById('postDetail').innerHTML = `<p style="color:red;">${res.message || '加载失败'}</p>`;
+                    return;
+                }
+                const data = res.data;
+                const p = data.post;
+                const comments = data.comments || [];
+
+                const postHtml = `
+                    <div class="post-header">
+                        <div class="post-title">${p.title}</div>
+                        <div class="post-meta">
+                            <span>标签：${p.tag || '学习'}</span>
+                            <span style="margin-left:15px;">作者：${p.userName || '匿名用户'}</span>
+                            <span style="margin-left:15px;">发布时间：${p.createTime ? formatDateTime(p.createTime) : ''}</span>
+                        </div>
+                    </div>
+                    <div class="post-content">${p.content || ''}</div>
+                    <div class="post-meta" style="margin-top:15px;">
+                        <span>👍 ${p.likeCount || 0}</span>
+                        <span style="margin-left:15px;">💬 ${p.commentCount || comments.length}</span>
+                    </div>
+                `;
+                document.getElementById('postDetail').innerHTML = postHtml;
+
+                if (comments.length === 0) {
+                    document.getElementById('commentList').innerHTML = '<p style="color:#888;">暂无评论，快来抢沙发吧！</p>';
+                } else {
+                    const commentHtml = comments.map(c => `
+                        <div class="comment-item" style="margin-bottom: 15px; padding: 15px; background: #f9f9f9; border-radius: 8px;">
+                            <div class="comment-meta" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span>👤 ${c.userName || '匿名用户'}</span>
+                                    <span style="margin-left:10px;">${c.createTime ? formatDateTime(c.createTime) : ''}</span>
+                                    ${c.parentId ? '<span style="margin-left:10px; color: #667eea;"> 回复 @' + (c.replyToName || '') + '</span>' : ''}
+                                </div>
+                                <a href="javascript:;" onclick="showReplyForm(${c.id}, '${c.userName || ''}')" style="color: #667eea; text-decoration: none;">回复</a>
+                            </div>
+                            <div class="comment-content" style="margin-top: 8px;">${c.content || ''}</div>
+                        </div>
+                    `).join('');
+                    document.getElementById('commentList').innerHTML = commentHtml;
+                }
+            });
+        }
+
+        // 显示回复表单
+        let replyingToId = null;
+        function showReplyForm(commentId, userName) {
+            replyingToId = commentId;
+            const commentInput = document.getElementById('commentInput');
+            commentInput.placeholder = '回复 @' + userName + '：';
+            commentInput.focus();
+        }
+
+        // 提交评论或回复
+        function submitComment() {
+            const content = document.getElementById('commentInput').value.trim();
+            if (!content) {
+                appAlert('评论内容不能为空');
+                return;
+            }
+
+            fetch('/api/user/info').then(r => r.json()).then(userRes => {
+                if (userRes.code !== 200) {
+                    appAlert('请先登录');
+                    location.href = '/login';
+                    return;
+                }
+
+                const data = {
+                    postId: postId,
+                    content: content
+                };
+
+                // 如果是回复，添加parentId
+                if (replyingToId) {
+                    data.parentId = replyingToId;
+                }
+
+                fetch('/api/post/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(r => r.json()).then(res => {
+                    if (res.code === 200) {
+                        appAlert(replyingToId ? '回复成功' : '评论成功');
+                        document.getElementById('commentInput').value = '';
+                        document.getElementById('commentInput').placeholder = '发表评论...';
+                        replyingToId = null;
+                        loadPostDetail();
+                    } else {
+                        appAlert(res.message || '评论失败');
+                    }
+                });
+            });
+        }
+
+        loadPostDetail();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" th:href="@{/images/favicon.svg}">
+    <title>交流论坛 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .post-card { border-left: 4px solid #667eea; }
+        .post-title { font-size: 18px; font-weight: bold; color: #333; cursor: pointer; }
+        .post-title:hover { color: #667eea; }
+        .post-meta { color: #888; font-size: 13px; margin-top: 10px; }
+        .post-stats { display: flex; gap: 20px; margin-top: 10px; color: #666; }
+        .tag { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">📚 图书馆座位预约系统</a>
+        <ul class="navbar-menu">
+            <li><a href="/">首页</a></li>
+            <li><a href="/studyroom">自习室</a></li>
+            <li><a href="/forum" class="active">交流论坛</a></li>
+            <li><a href="/announcement">系统公告</a></li>
+            <li><a href="/message">留言板</a></li>
+        </ul>
+        <div class="navbar-user">
+            <span id="userInfo"></span>
+            <a href="/login" class="btn btn-primary" id="loginBtn">登录</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-content">
+            <div class="flex-between mb-20">
+                <h2>💬 交流论坛</h2>
+                <button class="btn btn-primary" onclick="showPostModal()">发布帖子</button>
+            </div>
+            
+            <div id="postList">
+                <p style="color: #888; text-align: center;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 发帖弹窗 -->
+    <div class="modal" id="postModal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px;">发布帖子</h3>
+            <form id="postForm">
+                <div class="form-group">
+                    <label class="form-label">标题</label>
+                    <input type="text" name="title" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">标签</label>
+                    <select name="tag" class="form-input">
+                        <option value="学习">学习</option>
+                        <option value="生活">生活</option>
+                        <option value="提问">提问</option>
+                        <option value="分享">分享</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">内容</label>
+                    <textarea name="content" class="form-input" rows="5" required></textarea>
+                </div>
+                <div class="flex gap-10">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">发布</button>
+                    <button type="button" class="btn btn-secondary" onclick="closePostModal()" style="flex: 1;">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script th:src="@{/js/dialog.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script>
+        // 检查登录
+        fetch('/api/user/info').then(r => r.json()).then(res => {
+            if (res.code === 200) {
+                const userName = res.data.realName || res.data.username;
+                document.getElementById('userInfo').innerHTML = `<span>欢迎，${userName}</span>`;
+                document.getElementById('loginBtn').outerHTML =
+                    '<a href="/profile" class="btn btn-secondary">个人中心</a>' +
+                    '<button class="btn btn-warning" style="margin-left: 8px;" onclick="logout()">退出登录</button>';
+            }
+        });
+
+        async function logout() {
+            if (!await appConfirm('确认退出登录吗？')) {
+                return;
+            }
+            fetch('/api/user/logout', { method: 'POST' }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    location.href = '/login';
+                } else {
+                    appAlert(res.message || '退出失败');
+                }
+            }).catch(() => appAlert('退出失败，请稍后重试'));
+        }
+
+        // 加载帖子
+        function loadPosts() {
+            fetch('/api/post/list').then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    if (res.data.length === 0) {
+                        document.getElementById('postList').innerHTML = 
+                            '<p style="color: #888; text-align: center;">暂无帖子，快来发布第一篇吧！</p>';
+                        return;
+                    }
+                    
+                    const html = res.data.map(p => `
+                        <div class="card post-card">
+                            <span class="tag tag-primary">${p.tag || '学习'}</span>
+                            <div class="post-title" onclick="viewPost(${p.id})">${p.title}</div>
+                            <div class="post-meta">
+                                <span>👤 ${p.userName || '匿名用户'}</span>
+                                <span> 📅 ${p.createTime ? formatDateTime(p.createTime) : ''}</span>
+                            </div>
+                            <div class="post-stats">
+                                <span>👁️ ${p.viewCount || 0}</span>
+                                <span>👍 ${p.likeCount || 0}</span>
+                                <span>💬 ${p.commentCount || 0}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                    document.getElementById('postList').innerHTML = html;
+                }
+            });
+        }
+        
+        loadPosts();
+
+        // 跳转到帖子详情页
+        function viewPost(id) {
+            if (!id) {
+                appAlert('帖子ID无效');
+                return;
+            }
+            window.location.href = '/forum/detail?id=' + id;
+        }
+
+        function showPostModal() {
+            fetch('/api/user/info').then(r => r.json()).then(res => {
+                if (res.code !== 200) {
+                    appAlert('请先登录');
+                    location.href = '/login';
+                    return;
+                }
+                document.getElementById('postModal').classList.add('show');
+            });
+        }
+
+        function closePostModal() {
+            document.getElementById('postModal').classList.remove('show');
+        }
+
+        document.getElementById('postForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = {
+                title: formData.get('title'),
+                tag: formData.get('tag'),
+                content: formData.get('content')
+            };
+            
+            fetch('/api/post', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('发布成功');
+                    closePostModal();
+                    loadPosts();
+                } else {
+                    appAlert(res.message);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

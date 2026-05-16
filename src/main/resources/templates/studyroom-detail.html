@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" th:href="@{/images/favicon.svg}">
+    <title>自习室详情 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', -apple-system, sans-serif; }
+
+        .room-detail {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 32px;
+            align-items: start;
+        }
+
+        .room-header {
+            padding: 32px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04));
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            margin-bottom: 24px;
+        }
+
+        .room-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .room-meta {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .room-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--color-text-muted);
+        }
+
+        .room-meta-item svg {
+            width: 18px;
+            height: 18px;
+            color: var(--color-primary);
+        }
+
+        .room-price {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--color-primary);
+            margin-top: 16px;
+        }
+
+        .room-price span {
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--color-text-muted);
+        }
+
+        /* 座位图区域 */
+        .seat-section {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            padding: 24px;
+        }
+
+        .seat-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .seat-section-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .seat-legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--color-text-muted);
+        }
+
+        .legend-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .legend-available { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); }
+        .legend-occupied { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .legend-mine { background: var(--color-primary); }
+        .legend-power::after { content: '⚡'; font-size: 12px; }
+        .legend-window::after { content: '🪟'; font-size: 12px; }
+
+        /* 座位网格 */
+        .seat-grid-wrapper {
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.02) 0%, transparent 100%);
+        }
+
+        .seat-grid-container {
+            padding: 20px;
+            overflow: auto;
+            max-height: 450px;
+        }
+
+        .seat-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 8px;
+            min-width: 500px;
+        }
+
+        .seat-aisle {
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .seat {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s var(--ease-out-expo);
+            position: relative;
+            font-size: 13px;
+            font-weight: 600;
+            border: 2px solid transparent;
+        }
+
+        .seat:hover:not(.seat-occupied) {
+            transform: scale(1.12);
+            z-index: 10;
+        }
+
+        .seat-available {
+            background: rgba(34, 197, 94, 0.12);
+            border-color: rgba(34, 197, 94, 0.25);
+            color: var(--color-success);
+        }
+
+        .seat-available:hover {
+            background: rgba(34, 197, 94, 0.25);
+            border-color: rgba(34, 197, 94, 0.4);
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+        }
+
+        .seat-occupied {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.2);
+            color: rgba(239, 68, 68, 0.5);
+            cursor: not-allowed;
+        }
+
+        .seat-reserved {
+            background: rgba(245, 158, 11, 0.12);
+            border-color: rgba(245, 158, 11, 0.25);
+            color: var(--color-warning);
+            cursor: not-allowed;
+        }
+
+        .seat-selected {
+            background: var(--color-primary) !important;
+            border-color: var(--color-primary) !important;
+            color: #fff !important;
+            transform: scale(1.15);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5);
+        }
+
+        .seat-my-reservation {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: rgba(168, 85, 247, 0.4);
+            color: var(--color-accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(168, 85, 247, 0); }
+        }
+
+        .seat-icons {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 3px;
+            font-size: 9px;
+            opacity: 0.7;
+        }
+
+        .seat-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .seat-icon-power {
+            background: rgba(245, 158, 11, 0.3);
+            color: #f59e0b;
+        }
+
+        .seat-icon-window {
+            background: rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+
+        .seat:hover .seat-icons {
+            opacity: 1;
+        }
+
+        /* 讲台区域 */
+        .stage-area {
+            background: linear-gradient(180deg, var(--color-surface-elevated), transparent);
+            border-radius: 8px 8px 0 0;
+            padding: 12px;
+            text-align: center;
+            color: var(--color-text-subtle);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        /* 缩放控制 */
+        .zoom-controls {
+            position: fixed;
+            bottom: 100px;
+            right: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .zoom-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            background: var(--color-surface);
+            color: var(--color-text);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-md);
+        }
+
+        .zoom-btn:hover {
+            background: var(--color-primary);
+            border-color: var(--color-primary);
+            color: #fff;
+            transform: scale(1.05);
+        }
+
+        /* 实时状态指示器 */
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--color-text-muted);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--color-success);
+            border-radius: 50%;
+            animation: livePulse 2s infinite;
+        }
+
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* 预约表单 */
+        .booking-section {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            padding: 24px;
+            position: sticky;
+            top: 88px;
+        }
+
+        .booking-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .selected-seat-display {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .selected-seat-code {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+
+        .selected-seat-label {
+            font-size: 12px;
+            color: var(--color-text-muted);
+            margin-top: 4px;
+        }
+
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--color-text-muted);
+        }
+
+        .form-input {
+            background: var(--color-surface-elevated);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px;
+            width: 100%;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .form-time-display {
+            background: var(--color-surface-elevated);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-time-display:hover {
+            border-color: var(--color-primary);
+        }
+
+        .form-time-display svg {
+            width: 16px;
+            height: 16px;
+            color: var(--color-text-muted);
+            flex-shrink: 0;
+        }
+
+        .form-time-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-time-separator {
+            color: var(--color-text-subtle);
+            font-size: 12px;
+            padding-top: 24px;
+        }
+
+        /* 座位设施标签 */
+        .seat-facilities {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            justify-content: center;
+        }
+
+        .facility-tag {
+            padding: 4px 10px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .facility-power {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--color-warning);
+        }
+
+        .facility-window {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--color-success);
+        }
+
+        /* 刷新按钮 */
+        .refresh-btn {
+            background: transparent;
+            border: 1px solid var(--color-border);
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: var(--color-text-muted);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: var(--color-surface-elevated);
+            color: var(--color-text);
+        }
+
+        .refresh-btn.loading svg {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 评价区域 */
+        .evaluation-section {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .eval-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .eval-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .eval-stats {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 20px;
+            background: var(--color-surface-elevated);
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+
+        .eval-score {
+            text-align: center;
+        }
+
+        .eval-score-value {
+            font-size: 48px;
+            font-weight: 800;
+            color: var(--color-primary);
+            line-height: 1;
+        }
+
+        .eval-score-label {
+            font-size: 12px;
+            color: var(--color-text-muted);
+            margin-top: 4px;
+        }
+
+        .eval-bars {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .eval-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .eval-bar-label {
+            width: 30px;
+            color: var(--color-text-muted);
+        }
+
+        .eval-bar-track {
+            flex: 1;
+            height: 6px;
+            background: var(--color-border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .eval-bar-fill {
+            height: 100%;
+            background: var(--color-primary);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .eval-bar-count {
+            width: 30px;
+            text-align: right;
+            color: var(--color-text-subtle);
+        }
+
+        .eval-form {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(139, 92, 246, 0.03));
+            border: 1px solid var(--color-border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .star-rating {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .star {
+            font-size: 32px;
+            cursor: pointer;
+            color: var(--color-border);
+            transition: all 0.2s;
+        }
+
+        .star:hover, .star.active {
+            color: #fadb14;
+            transform: scale(1.1);
+        }
+
+        .eval-tip {
+            font-size: 12px;
+            color: var(--color-text-muted);
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .room-detail {
+                grid-template-columns: 1fr;
+            }
+            .booking-section {
+                position: static;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .seat-grid {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">
+            <div class="navbar-brand-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+            </div>
+            <span>图书馆座位</span>
+        </a>
+        <ul class="navbar-menu">
+            <li><a href="/">首页</a></li>
+            <li><a href="/studyroom" class="active">自习室</a></li>
+            <li><a href="/forum">交流论坛</a></li>
+            <li><a href="/announcement">系统公告</a></li>
+            <li><a href="/message">留言板</a></li>
+        </ul>
+        <div class="navbar-user">
+            <button id="themeToggle" class="btn btn-ghost" style="padding: 8px 12px; border-radius: 10px;" title="切换主题">
+                <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+            <span id="userInfo"></span>
+            <a href="/login" class="btn btn-primary" id="loginBtn">登录</a>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top: 88px; padding-bottom: 60px;">
+        <!-- 房间头部信息 -->
+        <div class="room-header">
+            <h1 class="room-title" id="roomName">加载中...</h1>
+            <div class="room-meta">
+                <div class="room-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span id="roomLocation">-</span>
+                </div>
+                <div class="room-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                    <span>容量 <span id="roomCapacity">-</span> 人</span>
+                </div>
+                <div class="room-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span id="roomOpenTime">08:00-22:00</span>
+                </div>
+            </div>
+            <div class="room-price">
+                ¥<span id="roomPrice">0</span> <span>/ 小时</span>
+            </div>
+        </div>
+
+        <div class="room-detail">
+            <!-- 左侧：座位图 -->
+            <div class="seat-section">
+                <div class="seat-section-header">
+                    <div>
+                        <h2 class="seat-section-title">座位图</h2>
+                        <div class="live-indicator" style="margin-top: 6px;">
+                            <div class="live-dot"></div>
+                            <span>实时更新中</span>
+                        </div>
+                    </div>
+                    <div class="seat-legend">
+                        <div class="legend-item"><div class="legend-dot legend-available"></div> 可选</div>
+                        <div class="legend-item"><div class="legend-dot legend-occupied"></div> 已占用</div>
+                        <div class="legend-item"><div class="legend-dot legend-mine"></div> 我的预约</div>
+                    </div>
+                </div>
+
+                <div class="seat-grid-wrapper">
+                    <div class="stage-area">讲台区域</div>
+                    <div class="seat-grid-container">
+                        <div class="seat-grid" id="seatGrid"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：预约表单 -->
+            <div>
+                <div class="booking-section" id="bookingSection" style="display: none;">
+                    <h3 class="booking-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        预约座位
+                    </h3>
+
+                    <div class="selected-seat-display">
+                        <div class="selected-seat-code" id="selectedSeatCode">--</div>
+                        <div class="selected-seat-label">已选座位</div>
+                        <div class="seat-facilities" id="selectedSeatFacilities"></div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">开始时间</label>
+                            <div class="form-time-display" onclick="document.getElementById('startTime').showPicker?.() || document.getElementById('startTime').focus()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                <span id="startTimeDisplay">请选择</span>
+                                <input type="datetime-local" id="startTime" class="form-input" style="position: absolute; opacity: 0; pointer-events: none;" onchange="updateTimeDisplay()">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束时间</label>
+                            <div class="form-time-display" onclick="document.getElementById('endTime').showPicker?.() || document.getElementById('endTime').focus()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                <span id="endTimeDisplay">请选择</span>
+                                <input type="datetime-local" id="endTime" class="form-input" style="position: absolute; opacity: 0; pointer-events: none;" onchange="updateTimeDisplay()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="submitBooking()" style="width: 100%; padding: 14px;">
+                        确认预约
+                    </button>
+                </div>
+
+                <!-- 未登录提示 -->
+                <div class="booking-section" id="loginPrompt">
+                    <div style="text-align: center; padding: 20px 0;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-subtle)" stroke-width="1.5" style="margin-bottom: 16px;">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <p style="color: var(--color-text-muted); margin-bottom: 16px;">登录后可预约座位</p>
+                        <a href="/login" class="btn btn-primary" style="width: 100%;">立即登录</a>
+                    </div>
+                </div>
+
+                <!-- 已有预约提示 -->
+                <div class="booking-section" id="myReservationInfo" style="display: none;">
+                    <h3 class="booking-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        我的预约
+                    </h3>
+                    <div id="myReservationContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 评价区域 -->
+        <div class="evaluation-section">
+            <div class="eval-header">
+                <h2 class="eval-title">用户评价</h2>
+            </div>
+            <div id="evaluationStats" class="eval-stats" style="display: none;">
+                <div class="eval-score">
+                    <div class="eval-score-value" id="avgScore">0.0</div>
+                    <div class="eval-score-label">综合评分</div>
+                </div>
+                <div class="eval-bars" id="scoreBars"></div>
+            </div>
+            <div id="evaluationList"></div>
+            <div id="evaluationEmpty" style="text-align: center; padding: 40px; color: var(--color-text-subtle);">暂无评价，快来抢沙发吧~</div>
+
+            <div id="evaluationForm" class="eval-form" style="display: none;">
+                <h4 style="margin-bottom: 16px;">发表评价</h4>
+                <div class="star-rating" id="starRating">
+                    <span class="star active" data-score="1">★</span>
+                    <span class="star active" data-score="2">★</span>
+                    <span class="star active" data-score="3">★</span>
+                    <span class="star active" data-score="4">★</span>
+                    <span class="star active" data-score="5">★</span>
+                </div>
+                <textarea id="evalContent" class="form-input" rows="3" placeholder="分享您的使用体验..." style="margin-bottom: 12px;"></textarea>
+                <button class="btn btn-primary" onclick="submitEvaluation()" style="width: 100%;">提交评价</button>
+                <p class="eval-tip" id="evalTip"></p>
+            </div>
+            <div id="evalLoginTip" style="display: none; text-align: center; padding: 20px; background: var(--color-surface-elevated); border-radius: 12px;">
+                <p style="color: var(--color-text-muted);">登录后可查看和发表评价</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 缩放控制 -->
+    <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoomIn()" title="放大">+</button>
+        <button class="zoom-btn" onclick="zoomOut()" title="缩小">-</button>
+        <button class="zoom-btn" onclick="resetZoom()" title="重置" style="font-size: 16px;">⟲</button>
+        <button class="zoom-btn" onclick="refreshSeats()" title="刷新" id="refreshBtn">↻</button>
+    </div>
+
+    <script th:src="@{/js/dialog.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script>
+        // Theme toggle
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            const icon = document.getElementById('themeIcon');
+            if (theme === 'light') {
+                icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+            } else {
+                icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+            }
+        }
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme);
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        });
+
+        const params = new URLSearchParams(location.search);
+        const roomId = params.get('id');
+        let selectedSeatId = null;
+        let selectedSeatCode = null;
+        let selectedSeatFacilities = { hasPower: false, hasWindow: false };
+        let currentZoom = 1;
+        let currentUser = null;
+        let selectedScore = 5;
+        let pendingReservationId = null;
+        let myReservation = null;
+        let refreshInterval = null;
+
+        // 缩放功能
+        function zoomIn() { currentZoom = Math.min(2, currentZoom + 0.1); updateZoom(); }
+        function zoomOut() { currentZoom = Math.max(0.5, currentZoom - 0.1); updateZoom(); }
+        function resetZoom() { currentZoom = 1; updateZoom(); }
+        function updateZoom() { document.getElementById('seatGrid').style.transform = `scale(${currentZoom})`; }
+
+        // 刷新座位
+        async function refreshSeats() {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('loading');
+            await loadSeats();
+            btn.classList.remove('loading');
+        }
+
+        // 启动实时刷新（每10秒）
+        function startRealTimeUpdates() {
+            refreshInterval = setInterval(() => {
+                if (!selectedSeatId) { // 未选座时自动刷新
+                    loadSeats();
+                }
+            }, 10000);
+        }
+
+        // 检查登录状态
+        fetch('/api/user/info').then(r => r.json()).then(res => {
+            if (res.code === 200) {
+                currentUser = res.data;
+                const userName = res.data.realName || res.data.username;
+                document.getElementById('userInfo').innerHTML = `<span style="color: var(--color-text-muted);">欢迎，${userName}</span>`;
+                document.getElementById('loginBtn').outerHTML =
+                    '<a href="/profile" class="btn btn-secondary">个人中心</a>' +
+                    '<button class="btn btn-ghost" onclick="logout()">退出</button>';
+                document.getElementById('loginPrompt').style.display = 'none';
+                document.getElementById('bookingSection').style.display = 'block';
+                document.getElementById('evaluationForm').style.display = 'block';
+                document.getElementById('evalLoginTip').style.display = 'none';
+                initStarRating();
+                checkMyReservation();
+            } else {
+                document.getElementById('loginPrompt').style.display = 'block';
+                document.getElementById('bookingSection').style.display = 'none';
+                document.getElementById('evalLoginTip').style.display = 'block';
+            }
+            loadEvaluations();
+        });
+
+        async function logout() {
+            if (!await appConfirm('确认退出登录吗？')) return;
+            fetch('/api/user/logout', { method: 'POST' }).then(r => r.json()).then(res => {
+                if (res.code === 200) location.href = '/login';
+                else appAlert(res.message || '退出失败');
+            });
+        }
+
+        // 检查我的预约
+        function checkMyReservation() {
+            fetch(`/api/reservation/my/active`).then(r => r.json()).then(res => {
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    const myRes = res.data.find(r => r.roomId == roomId);
+                    if (myRes) {
+                        myReservation = myRes;
+                        document.getElementById('myReservationInfo').style.display = 'block';
+                        document.getElementById('myReservationContent').innerHTML = `
+                            <div style="padding: 16px; background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(139, 92, 246, 0.05)); border-radius: 12px; margin-bottom: 12px;">
+                                <div style="font-size: 20px; font-weight: 700; color: var(--color-accent);">座位 ${myRes.seatCode}</div>
+                                <div style="font-size: 13px; color: var(--color-text-muted); margin-top: 6px;">
+                                    ${formatDateTime(myRes.startTime)} - ${formatDateTime(myRes.endTime)}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            });
+        }
+
+        // 加载座位
+        function loadSeats() {
+            return fetch(`/api/seat/room/${roomId}`).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    renderSeats(res.data);
+                }
+            });
+        }
+
+        // 渲染座位
+        function renderSeats(seats) {
+            let html = '';
+            seats.forEach((seat, index) => {
+                // 过道
+                const posInRow = (index % 10);
+                if (posInRow === 5) {
+                    html += '<div class="seat-aisle"></div>';
+                }
+
+                let seatClass = 'seat-available';
+                let isMySeat = false;
+
+                if (seat.status == 2) {
+                    seatClass = 'seat-occupied';
+                } else if (myReservation && myReservation.seatId == seat.id) {
+                    seatClass = 'seat-my-reservation';
+                    isMySeat = true;
+                }
+
+                if (selectedSeatId == seat.id) {
+                    seatClass = 'seat-selected';
+                }
+
+                html += `
+                    <div class="seat ${seatClass}"
+                         data-id="${seat.id}"
+                         data-code="${seat.seatCode}"
+                         data-status="${seat.status}"
+                         data-power="${seat.hasPower}"
+                         data-window="${seat.hasWindow}"
+                         ${isMySeat ? 'data-my="true"' : ''}>
+                        <span>${seat.seatCode.split('-').pop()}</span>
+                        <div class="seat-icons">
+                            ${seat.hasPower ? '<span class="seat-icon seat-icon-power"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>' : ''}
+                            ${seat.hasWindow ? '<span class="seat-icon seat-icon-window"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg></span>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('seatGrid').innerHTML = html;
+
+            // 绑定点击事件
+            document.querySelectorAll('.seat').forEach(el => {
+                el.addEventListener('click', function() {
+                    const status = this.dataset.status;
+                    const isMy = this.dataset.my === 'true';
+
+                    if (status === '2' && !isMy) {
+                        appAlert('该座位已被预约，请选择其他座位');
+                        return;
+                    }
+
+                    document.querySelectorAll('.seat').forEach(s => s.classList.remove('seat-selected'));
+                    this.classList.add('seat-selected');
+
+                    selectedSeatId = this.dataset.id;
+                    selectedSeatCode = this.dataset.code;
+                    selectedSeatFacilities = {
+                        hasPower: this.dataset.power === 'true',
+                        hasWindow: this.dataset.window === 'true'
+                    };
+
+                    // 更新预约表单
+                    document.getElementById('selectedSeatCode').textContent = selectedSeatCode;
+                    document.getElementById('selectedSeatFacilities').innerHTML = `
+                        ${selectedSeatFacilities.hasPower ? '<span class="facility-tag facility-power"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 4px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>有电源</span>' : ''}
+                        ${selectedSeatFacilities.hasWindow ? '<span class="facility-tag facility-window"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px; margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>靠窗</span>' : ''}
+                    `;
+
+                    document.getElementById('bookingSection').scrollIntoView({ behavior: 'smooth' });
+                    setDefaultTime();
+                });
+            });
+        }
+
+        // 设置默认时间
+        function setDefaultTime() {
+            const now = new Date();
+            now.setMinutes(0, 0, 0);
+            now.setHours(now.getHours() + 1);
+            const end = new Date(now);
+            end.setHours(end.getHours() + 2);
+            const formatDate = d => {
+                const pad = n => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+            document.getElementById('startTime').value = formatDate(now);
+            document.getElementById('endTime').value = formatDate(end);
+            updateTimeDisplay();
+        }
+
+        // 更新中文时间显示
+        function updateTimeDisplay() {
+            const startVal = document.getElementById('startTime').value;
+            const endVal = document.getElementById('endTime').value;
+
+            if (startVal) {
+                const d = new Date(startVal);
+                document.getElementById('startTimeDisplay').textContent =
+                    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+            }
+            if (endVal) {
+                const d = new Date(endVal);
+                document.getElementById('endTimeDisplay').textContent =
+                    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+            }
+        }
+
+        // 提交预约
+        async function submitBooking() {
+            if (!selectedSeatId) {
+                appAlert('请选择座位');
+                return;
+            }
+
+            const data = {
+                seatId: selectedSeatId,
+                roomId: roomId,
+                startTime: document.getElementById('startTime').value,
+                endTime: document.getElementById('endTime').value
+            };
+
+            try {
+                const res = await fetch('/api/reservation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                }).then(r => r.json());
+
+                if (res.code === 200) {
+                    await appAlert('预约成功！');
+                    location.href = '/profile';
+                } else {
+                    appAlert(res.message);
+                }
+            } catch (err) {
+                appAlert('预约失败，请稍后重试');
+            }
+        }
+
+        // 加载评价
+        function loadEvaluations() {
+            fetch(`/api/evaluation/room/${roomId}`).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    renderEvaluationStats(res.data.avgScore, res.data.stats, res.data.total);
+                    renderEvaluationList(res.data.list);
+                    if (currentUser) checkPendingEvaluation();
+                }
+            });
+        }
+
+        function renderEvaluationStats(avgScore, stats, total) {
+            if (total === 0) {
+                document.getElementById('evaluationStats').style.display = 'none';
+                return;
+            }
+            document.getElementById('evaluationStats').style.display = 'flex';
+            document.getElementById('avgScore').textContent = avgScore;
+
+            let barsHtml = '';
+            for (let i = 5; i >= 1; i--) {
+                const count = stats[i] || 0;
+                const pct = total > 0 ? (count / total * 100) : 0;
+                barsHtml += `
+                    <div class="eval-bar-row">
+                        <span class="eval-bar-label">${i}星</span>
+                        <div class="eval-bar-track"><div class="eval-bar-fill" style="width: ${pct}%"></div></div>
+                        <span class="eval-bar-count">${count}</span>
+                    </div>
+                `;
+            }
+            document.getElementById('scoreBars').innerHTML = barsHtml;
+        }
+
+        function renderEvaluationList(list) {
+            if (!list || list.length === 0) {
+                document.getElementById('evaluationList').innerHTML = '';
+                document.getElementById('evaluationEmpty').style.display = 'block';
+                return;
+            }
+            document.getElementById('evaluationEmpty').style.display = 'none';
+            let html = '';
+            list.forEach(item => {
+                const stars = '★'.repeat(item.score) + '☆'.repeat(5 - item.score);
+                html += `
+                    <div class="card" style="margin-bottom: 12px; padding: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;">
+                                    ${(item.userName || '匿').charAt(0)}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">${item.userName || '匿名用户'}</div>
+                                    <div style="color: #fadb14; font-size: 14px;">${stars}</div>
+                                </div>
+                            </div>
+                            <div style="color: var(--color-text-subtle); font-size: 12px;">${formatDateTime(item.createTime)}</div>
+                        </div>
+                        <div style="color: var(--color-text-muted); line-height: 1.7;">${item.content || '该用户未填写评价内容'}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('evaluationList').innerHTML = html;
+        }
+
+        function checkPendingEvaluation() {
+            fetch(`/api/evaluation/pending/${currentUser.id}`).then(r => r.json()).then(res => {
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    const pending = res.data.find(r => r.roomId == roomId);
+                    document.getElementById('evalTip').textContent = pending
+                        ? '感谢您使用过此自习室，请分享您的体验！'
+                        : '完成预约使用后可对本次体验进行评价';
+                }
+            });
+        }
+
+        function initStarRating() {
+            const stars = document.querySelectorAll('.star');
+            updateStars(selectedScore);
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    selectedScore = parseInt(this.dataset.score);
+                    updateStars(selectedScore);
+                });
+            });
+        }
+
+        function updateStars(score) {
+            document.querySelectorAll('.star').forEach((star, index) => {
+                star.classList.toggle('active', index < score);
+            });
+        }
+
+        function submitEvaluation() {
+            const content = document.getElementById('evalContent').value.trim();
+            if (!content) { appAlert('请输入评价内容'); return; }
+
+            const data = { roomId: roomId, score: selectedScore, content: content };
+            if (pendingReservationId) data.reservationId = pendingReservationId;
+
+            fetch('/api/evaluation', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(res => {
+                if (res.code === 200) {
+                    appAlert('评价成功，感谢您的反馈！');
+                    document.getElementById('evalContent').value = '';
+                    selectedScore = 5;
+                    updateStars(5);
+                    loadEvaluations();
+                } else {
+                    appAlert(res.message || '评价失败');
+                }
+            });
+        }
+
+        // 加载自习室详情
+        fetch(`/api/room/${roomId}`).then(r => r.json()).then(res => {
+            if (res.code === 200) {
+                const room = res.data;
+                document.getElementById('roomName').textContent = room.roomName;
+                document.getElementById('roomLocation').textContent = room.location || '-';
+                document.getElementById('roomCapacity').textContent = room.capacity || '-';
+                document.getElementById('roomOpenTime').textContent = room.openTime || '08:00-22:00';
+                document.getElementById('roomPrice').textContent = room.hourPrice || '0';
+            }
+        });
+
+        // 初始化
+        loadSeats();
+        startRealTimeUpdates();
+
+        // 页面离开时清除定时器
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) clearInterval(refreshInterval);
+        });
+    </script>
+</body>
+</html>
