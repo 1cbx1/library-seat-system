@@ -53,8 +53,6 @@ generate_narration.ps1
 generate_narration.py
 generate_subtitles.py
 
-# Vue Frontend
-frontend/
 
 # Chinese named files
 *.pptx

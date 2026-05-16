@@ -1,0 +1,63 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: library-seat-system
+
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 请修改为你的数据库信息
+    url: jdbc:mysql://localhost:3306/library_seat?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+  web:
+    resources:
+      static-locations: classpath:/static/,file:${upload.path}/
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.library.seat.entity
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+jwt:
+  secret: library-seat-system-secret-key-2024
+  expiration: 86400000
+
+admin:
+  username: admin
+  password: admin123
+
+# 改为你本地的上传目录（Windows 用 D:/... 或 C:/...，Linux/Mac 用 /home/...）
+upload:
+  path: ./uploads
+
+logging:
+  level:
+    root: INFO
+    com.library.seat: DEBUG

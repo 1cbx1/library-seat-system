@@ -1,0 +1,19 @@
+{
+  "name": "library-seat-system",
+  "version": "1.0.0",
+  "description": "## 📌 项目简介 这是一个基于 SpringBoot + Thymeleaf 的图书馆座位预约系统，适合作为毕业设计项目。",
+  "main": "create-defense-ppt.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pptxgenjs": "^4.0.1",
+    "puppeteer": "^25.0.2"
+  },
+  "directories": {
+    "doc": "docs"
+  }
+}
