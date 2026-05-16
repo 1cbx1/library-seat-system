@@ -1,0 +1,61 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Maven
+target/
+*.class
+
+# Node
+node_modules/
+package-lock.json
+
+# Logs
+logs/
+
+# Uploads
+uploads/
+
+# Large media files
+*.mp4
+*.mp3
+*.wav
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Screenshots and temp files
+*.png
+*.jpg
+capture_*.js
+record_demo.js
+frames/
+frames_video.mp4
+subtitle_check*.png
+subtitle*.srt
+temp_record.mp4
+demo-video.mp4
+
+# Docs (exclude large docs)
+docs/
+
+# Scripts
+combine_audio.py
+create-defense-ppt.js
+create_video.sh
+generate-defense-ppt-*.js
+generate_narration.ps1
+generate_narration.py
+generate_subtitles.py
+
+# Vue Frontend
+frontend/
+
+# Chinese named files
+*.pptx
+*.docx
